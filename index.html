@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Param Papers — Order Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Firebase Compat SDK (no ES modules, no scoping issues) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+:root {
+  --primary:   #4A90D9;
+  --bg:        #000;
+  --surface:   #1e1e1e;
+  --surface2:  #141414;
+  --border:    rgba(255,255,255,0.07);
+  --white:     #fff;
+  --grey1:     #e5e5e5;
+  --grey2:     #a0a0a0;
+  --grey3:     #555;
+  --danger:    #ff4444;
+  --warn:      #f59e0b;
+  --success:   #4A90D9;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: #000;
+  background-image: radial-gradient(ellipse 80% 40% at 50% -10%, rgba(74,144,217,0.06) 0%, transparent 70%);
+  color: #fff;
+  min-height: 100vh;
+  padding-bottom: 100px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── TOP BAR ── */
+.top-bar {
+  background: rgba(10,10,10,0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 0 20px;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.logo-title {
+  font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
+  background: linear-gradient(135deg,#fff 0%,rgba(255,255,255,0.75) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.logo-sub { font-size: 10px; color: #555; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; margin-left: 8px; }
+.live-clock { font-size: 11px; color: #555; font-weight: 500; }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  display: flex;
+  background: rgba(10,10,10,0.6);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 100px; padding: 6px; gap: 2px; z-index: 200;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.07) inset;
+}
+.nav-btn {
+  width: 62px; padding: 10px 0 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  cursor: pointer; color: rgba(255,255,255,0.28);
+  font-size: 9px; font-weight: 600; font-family: 'Inter',sans-serif;
+  letter-spacing: 0.3px; text-transform: uppercase;
+  border: none; background: none; border-radius: 100px;
+  transition: all 0.2s; position: relative;
+}
+.nav-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nav-btn:hover { color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.05); }
+.nav-btn.active { background: rgba(255,255,255,0.11); color: rgba(255,255,255,0.9); font-weight: 700; box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset; }
+.nav-btn.active svg { filter: drop-shadow(0 0 6px rgba(255,255,255,0.4)); }
+.nav-badge {
+  position: absolute; top: 6px; right: 6px;
+  background: var(--danger); color: #fff; font-size: 9px; font-weight: 800;
+  padding: 1px 5px; border-radius: 10px; min-width: 14px; text-align: center;
+  border: 1.5px solid #000;
+}
+
+/* ── PAGES ── */
+.main { padding: 20px; max-width: 700px; margin: 0 auto; }
+.page { display: none; }
+.page.active { display: block; }
+
+.page-title {
+  font-size: 24px; font-weight: 800; letter-spacing: -0.5px;
+  background: linear-gradient(135deg,#fff,rgba(255,255,255,0.7));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 4px;
+}
+.page-sub { font-size: 13px; color: #555; font-weight: 500; margin-bottom: 20px; }
+
+/* ── CARDS ── */
+.card {
+  background: linear-gradient(160deg,#1e1e1e 0%,#141414 100%);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px; padding: 18px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 4px 20px rgba(0,0,0,0.5);
+  position: relative; margin-bottom: 16px;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px;
+  background: linear-gradient(90deg,transparent,rgba(74,144,217,0.35),transparent);
+}
+
+/* ── FORM ── */
+.section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: #555; margin: 18px 0 12px; padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.section-label:first-child { margin-top: 0; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+label { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: #555; }
+input[type=text], input[type=number], input[type=date], textarea {
+  padding: 11px 13px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  font-family: 'Inter',sans-serif; font-size: 14px; font-weight: 500;
+  color: #fff; background: rgba(255,255,255,0.04); outline: none; width: 100%;
+  transition: border-color 0.18s, background 0.18s; -webkit-appearance: none;
+}
+input:focus, textarea:focus {
+  border-color: rgba(74,144,217,0.5); background: rgba(74,144,217,0.06);
+  box-shadow: 0 0 0 3px rgba(74,144,217,0.12);
+}
+input::placeholder, textarea::placeholder { color: #444; }
+textarea { min-height: 72px; resize: vertical; }
+input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.5); }
+
+/* ── AUTOCOMPLETE ── */
+.ac-wrap { position: relative; }
+.ac-list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: #1e1e1e; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7); z-index: 1000;
+  max-height: 200px; overflow-y: auto; display: none;
+}
+.ac-list.open { display: block; }
+.ac-item { padding: 11px 14px; font-size: 13px; font-weight: 600; cursor: pointer; color: #e5e5e5; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+
+/* ── BUTTONS ── */
+.btn-primary {
+  padding: 12px 24px; background: linear-gradient(135deg,#1a3a5c,#0f2540);
+  color: #fff; border: none; border-radius: 10px; font-weight: 700; font-size: 14px;
+  font-family: 'Inter',sans-serif; cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(74,144,217,0.4); transition: opacity 0.18s;
+}
+.btn-primary:active { opacity: 0.8; }
+.btn-ghost {
+  padding: 12px 20px; background: rgba(255,255,255,0.05); color: #888;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  font-weight: 700; font-family: 'Inter',sans-serif; cursor: pointer; margin-left: 8px;
+}
+
+/* ── PENDING BANNER ── */
+.pending-banner {
+  background: linear-gradient(160deg,#1e1e1e,#141414);
+  border: 1px solid rgba(74,144,217,0.2); border-radius: 16px;
+  padding: 22px 20px; margin-bottom: 16px; position: relative; overflow: hidden;
+}
+.pending-banner::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px;
+  background: linear-gradient(90deg,transparent,rgba(74,144,217,0.6),transparent);
+}
+.pending-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #555; margin-bottom: 6px; }
+.pending-num { font-size: 44px; font-weight: 800; color: #fff; letter-spacing: -0.03em; line-height: 1; }
+
+/* ── TABLE ── */
+.table-wrap {
+  background: linear-gradient(160deg,#1e1e1e,#141414);
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden;
+  position: relative;
+}
+.table-wrap::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px;
+  background: linear-gradient(90deg,transparent,rgba(74,144,217,0.35),transparent);
+}
+.table-head {
+  padding: 14px 18px; display: flex; align-items: center;
+  justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+}
+.table-title { font-weight: 700; font-size: 15px; color: #fff; }
+.search-input {
+  padding: 8px 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04); color: #fff; font-family: 'Inter',sans-serif;
+  font-size: 13px; outline: none; width: 150px;
+}
+.search-input:focus { border-color: rgba(74,144,217,0.4); }
+.search-input::placeholder { color: #444; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  padding: 10px 14px; font-size: 10px; font-weight: 700; color: #555;
+  background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.06);
+  text-align: left; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap;
+}
+tbody td {
+  padding: 11px 14px; color: #a0a0a0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 13px; font-weight: 500; vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+.overdue { color: var(--danger) !important; }
+.soon    { color: var(--warn) !important; }
+
+/* ── TABLE ACTION BUTTONS ── */
+.tbl-btn {
+  padding: 5px 11px; border: none; border-radius: 8px; font-weight: 700;
+  font-size: 11px; font-family: 'Inter',sans-serif; cursor: pointer;
+}
+.tbl-btn-edit { background: linear-gradient(135deg,#1a3a5c,#0f2540); color: #fff; box-shadow: 0 0 0 1px rgba(74,144,217,0.3); }
+.tbl-btn-done { background: rgba(74,144,217,0.12); color: var(--success); border: 1px solid rgba(74,144,217,0.25) !important; margin-left: 4px; }
+.tbl-btn-del  { background: rgba(255,68,68,0.1); color: var(--danger); border: 1px solid rgba(255,68,68,0.2) !important; margin-left: 4px; }
+.tbl-btn-rev  { background: rgba(245,158,11,0.1); color: var(--warn); border: 1px solid rgba(245,158,11,0.2) !important; }
+
+/* ── MOBILE CARDS ── */
+.mob-cards { display: none; padding: 12px; }
+@media (max-width: 600px) {
+  table, thead, tbody, th, td, tr { display: none !important; }
+  .mob-cards { display: block !important; }
+  .form-grid, .form-grid-3 { grid-template-columns: 1fr 1fr; }
+  .table-head { flex-direction: column; align-items: stretch; }
+  .table-head .search-input { width: 100%; }
+  .pending-num { font-size: 36px; }
+  .search-wrap { flex-direction: column; }
+}
+.mob-card {
+  background: linear-gradient(160deg,#1e1e1e,#141414);
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 14px;
+  padding: 14px; margin-bottom: 10px; position: relative;
+}
+.mob-card::before { content: ''; position: absolute; top: 0; left: 12px; right: 12px; height: 1px; background: linear-gradient(90deg,transparent,rgba(74,144,217,0.3),transparent); }
+.mob-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.mob-card-id { font-size: 10px; color: #555; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 2px; }
+.mob-card-company { font-weight: 800; font-size: 16px; color: #fff; }
+.mob-card-qty { font-size: 22px; font-weight: 800; color: var(--success); line-height: 1; }
+.mob-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.mob-tag { background: rgba(255,255,255,0.06); padding: 3px 9px; border-radius: 100px; font-size: 11px; font-weight: 600; color: #a0a0a0; border: 1px solid rgba(255,255,255,0.08); }
+.mob-tag.overdue { background: rgba(255,68,68,0.1); color: var(--danger); border-color: rgba(255,68,68,0.2); }
+.mob-tag.soon    { background: rgba(245,158,11,0.1); color: var(--warn); border-color: rgba(245,158,11,0.2); }
+.mob-card-notes  { font-size: 12px; color: #555; font-style: italic; margin-bottom: 10px; }
+.mob-card-done-meta { font-size: 11px; color: var(--success); font-weight: 700; margin: 6px 0 10px; }
+.mob-card-actions { display: flex; gap: 7px; }
+.mob-card-actions button { flex: 1; padding: 10px; border: none; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: 'Inter',sans-serif; }
+.mob-btn-edit   { background: linear-gradient(135deg,#1a3a5c,#0f2540); color: #fff; }
+.mob-btn-done   { background: rgba(74,144,217,0.12); color: var(--success); border: 1px solid rgba(74,144,217,0.3) !important; }
+.mob-btn-del    { background: rgba(255,68,68,0.1); color: var(--danger); flex: 0 0 44px !important; border: 1px solid rgba(255,68,68,0.2) !important; }
+.mob-btn-revert { background: rgba(245,158,11,0.1); color: var(--warn); border: 1px solid rgba(245,158,11,0.2) !important; }
+
+/* ── NOTES TOOLTIP ── */
+.notes-cell { position: relative; display: inline-block; max-width: 110px; }
+.notes-text { font-size: 11px; color: #555; font-style: italic; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.notes-tip {
+  visibility: hidden; opacity: 0;
+  background: #1e1e1e; border: 1px solid rgba(255,255,255,0.12); color: #e5e5e5;
+  font-size: 12px; font-weight: 500; padding: 10px 14px; border-radius: 10px;
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  white-space: normal; width: 220px; z-index: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6); transition: opacity 0.2s; pointer-events: none; line-height: 1.5;
+}
+.notes-tip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #1e1e1e; }
+.notes-cell:hover .notes-tip { visibility: visible; opacity: 1; }
+
+/* ── DASHBOARD ── */
+.dash-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.dash-col-title { font-weight: 700; font-size: 15px; color: #fff; }
+.dash-col-badge { background: rgba(74,144,217,0.12); border: 1px solid rgba(74,144,217,0.25); color: var(--success); font-weight: 700; font-size: 11px; padding: 3px 10px; border-radius: 100px; }
+.dash-col-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.week-section { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+.week-header { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+.dash-card { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 11px 13px; margin-bottom: 6px; cursor: pointer; }
+.dash-card:active { background: rgba(255,255,255,0.07); }
+.dash-card-co { font-weight: 700; font-size: 13px; color: #fff; margin-bottom: 3px; }
+.dash-card-meta { font-size: 11px; color: #555; display: flex; gap: 8px; }
+.dash-card-qty { font-size: 15px; font-weight: 700; color: var(--success); }
+.summary-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 11px 13px; margin-bottom: 6px; cursor: pointer; }
+.summary-item:active { background: rgba(255,255,255,0.07); }
+.summary-label { font-weight: 600; color: #a0a0a0; }
+.summary-value { font-weight: 700; color: var(--success); }
+
+/* ── DATABASE ── */
+.db-entry { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 11px 13px; margin-bottom: 6px; }
+.db-entry span { font-weight: 600; font-size: 13px; color: #e5e5e5; }
+.db-del-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-weight: 800; font-size: 14px; padding: 0 4px; }
+.db-add-row { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+.db-add-btn { padding: 10px 16px; background: rgba(74,144,217,0.12); color: var(--success); border: 1px solid rgba(74,144,217,0.3); border-radius: 10px; font-weight: 700; font-family: 'Inter',sans-serif; cursor: pointer; font-size: 13px; white-space: nowrap; }
+
+/* ── MODAL ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 2000; display: none; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: linear-gradient(160deg,#1e1e1e,#141414); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; width: 90%; max-width: 340px; padding: 28px; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.8); }
+.modal-title { font-weight: 800; font-size: 20px; color: #fff; letter-spacing: -0.3px; margin-bottom: 10px; }
+.modal-text  { color: #888; font-size: 14px; margin-bottom: 22px; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-cancel  { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); font-weight: 700; background: rgba(255,255,255,0.05); cursor: pointer; color: #888; font-family: 'Inter',sans-serif; }
+.modal-confirm { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; font-family: 'Inter',sans-serif; }
+
+/* ── TOAST ── */
+.toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); background: #1e1e1e; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 11px 22px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'Inter',sans-serif; display: none; z-index: 3000; box-shadow: 0 8px 32px rgba(0,0,0,0.6); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <div style="display:flex;align-items:baseline;gap:2px;">
+    <span class="logo-title">Param Papers</span>
+    <span class="logo-sub">Orders</span>
+  </div>
+  <span class="live-clock" id="live-clock"></span>
+</header>
+
+<main class="main">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub">Production outlook</div>
+    <div class="dash-grid">
+      <div class="card">
+        <div class="dash-col-header">
+          <span class="dash-col-title">Delivery Timeline</span>
+          <span class="dash-col-badge" id="dash-timeline-total">Σ 0</span>
+        </div>
+        <div id="dash-list-timeline"></div>
+      </div>
+      <div class="card">
+        <div class="dash-col-header">
+          <span class="dash-col-title">Quality Wise</span>
+          <span class="dash-col-badge" id="dash-quality-total">Σ 0</span>
+        </div>
+        <div id="dash-list-quality"></div>
+      </div>
+      <div class="card">
+        <div class="dash-col-header">
+          <span class="dash-col-title">Party Status</span>
+          <span class="dash-col-badge" id="dash-party-total">Σ 0</span>
+        </div>
+        <div id="dash-list-party"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW ORDER -->
+  <div class="page" id="page-new">
+    <div class="page-title" id="form-title">New Order</div>
+    <div class="page-sub">Record a new production batch</div>
+    <div class="card">
+      <input type="hidden" id="f-id"/>
+      <div class="section-label">General Info</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Order Date</label><input type="date" id="f-date"/></div>
+        <div class="form-group"><label>Delivery Target</label><input type="date" id="f-delivery"/></div>
+        <div class="form-group"><label>AR Reference</label><input type="text" id="f-ar" placeholder="e.g. AR-101"/></div>
+        <div class="form-group"><label>SR Reference</label><input type="text" id="f-sr" placeholder="e.g. SR-505"/></div>
+      </div>
+      <div class="section-label">Client & Logistics</div>
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label>Company</label>
+          <div class="ac-wrap">
+            <input type="text" id="f-company" placeholder="Search parties…" autocomplete="off" oninput="acFilter('company',this.value)" onfocus="acFilter('company',this.value)" onblur="acClose('company')"/>
+            <div class="ac-list" id="ac-company"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Quality</label>
+          <div class="ac-wrap">
+            <input type="text" id="f-quality" placeholder="Search qualities…" autocomplete="off" oninput="acFilter('quality',this.value)" onfocus="acFilter('quality',this.value)" onblur="acClose('quality')"/>
+            <div class="ac-list" id="ac-quality"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Place</label>
+          <div class="ac-wrap">
+            <input type="text" id="f-place" placeholder="Search places…" autocomplete="off" oninput="acFilter('place',this.value)" onfocus="acFilter('place',this.value)" onblur="acClose('place')"/>
+            <div class="ac-list" id="ac-place"></div>
+          </div>
+        </div>
+      </div>
+      <div class="section-label">Specs</div>
+      <div class="form-grid">
+        <div class="form-group"><label>GSM</label><input type="number" id="f-gsm" placeholder="e.g. 230"/></div>
+        <div class="form-group"><label>Size</label><input type="text" id="f-size" placeholder='e.g. 100"'/></div>
+        <div class="form-group"><label>Quantity</label><input type="number" id="f-qty" placeholder="e.g. 2000"/></div>
+      </div>
+      <div class="section-label">Notes</div>
+      <div class="form-group" style="margin-bottom:18px;">
+        <textarea id="f-notes" placeholder="Special instructions…"></textarea>
+      </div>
+      <button class="btn-primary" id="btn-submit" onclick="submitOrder()">＋ Create Order</button>
+      <button class="btn-ghost" id="btn-cancel-edit" style="display:none;" onclick="cancelEdit()">Discard</button>
+    </div>
+  </div>
+
+  <!-- LIVE ORDERS -->
+  <div class="page" id="page-live">
+    <div class="pending-banner">
+      <div>
+        <div class="pending-label">Total Pending Quantity</div>
+        <div class="pending-num" id="stat-pending-total">0</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-head">
+        <span class="table-title">Current Pipeline</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" class="search-wrap">
+          <input class="search-input" type="text" id="live-search-company" placeholder="🔍 Company…" oninput="renderLive()"/>
+          <input class="search-input" type="text" id="live-search-quality" placeholder="🔍 Quality…" oninput="renderLive()"/>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Date</th><th>Company</th><th>Quality</th><th>GSM</th><th>Size</th><th>Qty</th><th>Refs</th><th>Place</th><th>Delivery</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody id="live-tbody"></tbody>
+        </table>
+      </div>
+      <div class="mob-cards" id="live-mob-cards"></div>
+    </div>
+  </div>
+
+  <!-- COMPLETED -->
+  <div class="page" id="page-done">
+    <div class="table-wrap">
+      <div class="table-head">
+        <span class="table-title">Fulfilled Batches</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" class="search-wrap">
+          <input class="search-input" type="text" id="done-search-company" placeholder="🔍 Company…" oninput="renderDone()"/>
+          <input class="search-input" type="text" id="done-search-quality" placeholder="🔍 Quality…" oninput="renderDone()"/>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Date</th><th>Company</th><th>Quality</th><th>GSM</th><th>Size</th><th>Qty</th><th>Refs</th><th>Place</th><th>Delivery</th><th>Completed</th><th>Notes</th><th>Action</th></tr></thead>
+          <tbody id="done-tbody"></tbody>
+        </table>
+      </div>
+      <div class="mob-cards" id="done-mob-cards"></div>
+    </div>
+  </div>
+
+  <!-- DATABASE -->
+  <div class="page" id="page-db">
+    <div class="page-title">Resources</div>
+    <div class="page-sub">Manage dropdown lists</div>
+    <div class="dash-grid">
+      <div class="card">
+        <div class="dash-col-header">
+          <span class="dash-col-title">Companies</span>
+          <span class="dash-col-badge" id="dbc-company">0</span>
+        </div>
+        <div id="dbl-company"></div>
+        <div class="db-add-row">
+          <input type="text" id="dbi-company" placeholder="Add company…" onkeydown="if(event.key==='Enter')dbAdd('company')"/>
+          <button class="db-add-btn" onclick="dbAdd('company')">Add</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="dash-col-header">
+          <span class="dash-col-title">Qualities</span>
+          <span class="dash-col-badge" id="dbc-quality">0</span>
+        </div>
+        <div id="dbl-quality"></div>
+        <div class="db-add-row">
+          <input type="text" id="dbi-quality" placeholder="Add quality…" onkeydown="if(event.key==='Enter')dbAdd('quality')"/>
+          <button class="db-add-btn" onclick="dbAdd('quality')">Add</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="dash-col-header">
+          <span class="dash-col-title">Places</span>
+          <span class="dash-col-badge" id="dbc-place">0</span>
+        </div>
+        <div id="dbl-place"></div>
+        <div class="db-add-row">
+          <input type="text" id="dbi-place" placeholder="Add place…" onkeydown="if(event.key==='Enter')dbAdd('place')"/>
+          <button class="db-add-btn" onclick="dbAdd('place')">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-btn-dashboard" onclick="showPage('dashboard',this)">
+    <svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 16v-4m4 4V9m4 7v-9"/></svg>
+    <span>Dashboard</span>
+  </button>
+  <button class="nav-btn" id="nav-btn-new" onclick="showPage('new',this)">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    <span>Order</span>
+  </button>
+  <button class="nav-btn" id="nav-btn-live" onclick="showPage('live',this)">
+    <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+    <span>Live</span>
+    <span class="nav-badge" id="live-badge">0</span>
+  </button>
+  <button class="nav-btn" id="nav-btn-done" onclick="showPage('done',this)">
+    <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+    <span>Done</span>
+  </button>
+  <button class="nav-btn" id="nav-btn-db" onclick="showPage('db',this)">
+    <svg viewBox="0 0 24 24"><path d="M20 7L12 3 4 7m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4L4 7m8 4v10M4 7v10l8 4"/></svg>
+    <span>DB</span>
+  </button>
+</nav>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Confirm</div>
+    <div class="modal-text"  id="modal-text">Are you sure?</div>
+    <div class="modal-actions">
+      <button class="modal-cancel"  onclick="closeModal()">Cancel</button>
+      <button class="modal-confirm" id="modal-confirm-btn" onclick="runModalCallback()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────
+var db;
+var orders   = [];
+var nextId   = 1;
+var lists    = { company: [], quality: [], place: [] };
+var editingId = null;
+var modalCallback = null;
+
+// ── FIREBASE ───────────────────────────────────────────────────────────────
+async function loadAll() {
+  showToast('⏳ Loading…');
+  try {
+    const snap = await db.collection('orders').get();
+    orders = snap.docs.map(d => d.data());
+    nextId = orders.length ? Math.max(...orders.map(o => o.id)) + 1 : 1;
+    const cfgDoc = await db.collection('config').doc('db_store').get();
+    if (cfgDoc.exists) lists = cfgDoc.data();
+  } catch(e) {
+    console.error(e);
+    showToast('⚠️ Could not load data');
+  }
+  updateBadges(); updateStats(); renderDbCards(); renderDashboard();
+  showToast('✅ Loaded');
+}
+
+async function saveOrders() {
+  updateBadges(); updateStats(); renderDashboard();
+  try {
+    for (const o of orders) await db.collection('orders').doc(String(o.id)).set(o);
+  } catch(e) { showToast('⚠️ Sync failed'); }
+}
+
+async function deleteOrder(id) {
+  try { await db.collection('orders').doc(String(id)).delete(); } catch(e) {}
+}
+
+async function saveLists() {
+  renderDbCards();
+  try { await db.collection('config').doc('db_store').set(lists); } catch(e) {}
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────────
+function showPage(p, btn) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (p === 'live')      renderLive();
+  if (p === 'done')      renderDone();
+  if (p === 'dashboard') renderDashboard();
+  if (p === 'db')        renderDbCards();
+}
+
+// ── CLOCK ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('live-clock').textContent =
+    now.toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short'}) + '  ' +
+    now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// ── MODAL ──────────────────────────────────────────────────────────────────
+function openModal(title, text, label, cb, isDanger) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-text').textContent  = text;
+  const btn = document.getElementById('modal-confirm-btn');
+  btn.textContent   = label;
+  btn.style.background = isDanger ? 'rgba(255,68,68,0.15)' : 'linear-gradient(135deg,#1a3a5c,#0f2540)';
+  btn.style.color      = isDanger ? '#ff4444' : '#fff';
+  btn.style.boxShadow  = isDanger ? '0 0 0 1px rgba(255,68,68,0.3)' : '0 0 0 1px rgba(74,144,217,0.4)';
+  modalCallback = cb;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal()       { document.getElementById('modal-overlay').classList.remove('open'); modalCallback = null; }
+function runModalCallback() { if (modalCallback) modalCallback(); closeModal(); }
+
+// ── FORM ───────────────────────────────────────────────────────────────────
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+document.getElementById('f-date').value = todayStr();
+
+function submitOrder() {
+  const get = id => document.getElementById(id).value.trim();
+  const fields = {
+    date: get('f-date'), delivery: get('f-delivery'),
+    company: get('f-company'), quality: get('f-quality'), place: get('f-place'),
+    gsm: get('f-gsm'), size: get('f-size'),
+    qty: parseFloat(get('f-qty')) || 0,
+    ar: get('f-ar'), sr: get('f-sr'),
+    notes: get('f-notes'),
+  };
+  if (!fields.company || !fields.quality || !fields.qty || !fields.delivery) {
+    showToast('⚠️ Fill required fields'); return;
+  }
+  if (editingId) {
+    const idx = orders.findIndex(o => o.id === editingId);
+    if (idx !== -1) orders[idx] = { ...orders[idx], ...fields };
+    cancelEdit();
+  } else {
+    orders.push({ id: nextId++, ...fields, status: 'live', completedOn: null });
+  }
+  saveOrders(); resetForm(); showToast('✅ Order saved');
+}
+
+function resetForm() {
+  ['f-company','f-quality','f-place','f-gsm','f-size','f-qty','f-ar','f-sr','f-delivery','f-notes']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-date').value = todayStr();
+  editingId = null;
+  document.getElementById('form-title').textContent = 'New Order';
+  document.getElementById('btn-submit').textContent  = '＋ Create Order';
+  document.getElementById('btn-cancel-edit').style.display = 'none';
+}
+
+function editOrder(id) {
+  const o = orders.find(x => x.id === id); if (!o) return;
+  editingId = id;
+  const set = (elId, val) => { document.getElementById(elId).value = val || ''; };
+  set('f-date',o.date); set('f-delivery',o.delivery); set('f-company',o.company);
+  set('f-quality',o.quality); set('f-place',o.place); set('f-gsm',o.gsm);
+  set('f-size',o.size); set('f-qty',o.qty); set('f-ar',o.ar); set('f-sr',o.sr); set('f-notes',o.notes);
+  document.getElementById('form-title').textContent = 'Edit Order #' + String(id).padStart(3,'0');
+  document.getElementById('btn-submit').textContent  = 'Save Changes';
+  document.getElementById('btn-cancel-edit').style.display = 'inline-block';
+  showPage('new', document.getElementById('nav-btn-new'));
+}
+
+function cancelEdit() { resetForm(); showPage('live', document.getElementById('nav-btn-live')); }
+
+// ── ACTIONS ────────────────────────────────────────────────────────────────
+function confirmDone(id) {
+  openModal('Complete Batch','Move to history?','Mark Done', () => {
+    const o = orders.find(x => x.id === id);
+    if (o) { o.status = 'done'; o.completedOn = todayStr(); saveOrders(); renderLive(); }
+  });
+}
+function confirmDelete(id) {
+  openModal('Delete Batch','This is permanent.','Delete', async () => {
+    orders = orders.filter(x => x.id !== id);
+    await deleteOrder(id); updateBadges(); updateStats(); renderDashboard(); renderLive();
+  }, true);
+}
+function confirmRevert(id) {
+  openModal('Restore Batch','Move back to active?','Restore', () => {
+    const o = orders.find(x => x.id === id);
+    if (o) { o.status = 'live'; o.completedOn = null; saveOrders(); renderDone(); }
+  });
+}
+
+// ── STATS ──────────────────────────────────────────────────────────────────
+function updateBadges() { document.getElementById('live-badge').textContent = orders.filter(o => o.status === 'live').length; }
+function updateStats()  {
+  const total = orders.filter(o => o.status === 'live').reduce((s,o) => s + (parseFloat(o.qty)||0), 0);
+  document.getElementById('stat-pending-total').textContent = total.toLocaleString();
+}
+
+// ── AUTOCOMPLETE ───────────────────────────────────────────────────────────
+function acFilter(field, val) {
+  const list = document.getElementById('ac-' + field);
+  const items = lists[field].filter(x => !val || x.toLowerCase().includes(val.toLowerCase()));
+  if (!items.length) { list.classList.remove('open'); return; }
+  list.innerHTML = items.map(x => `<div class="ac-item" onmousedown="acSelect('${field}','${esc(x)}')">${esc(x)}</div>`).join('');
+  list.classList.add('open');
+}
+function acSelect(field, val) { document.getElementById('f-' + field).value = val; document.getElementById('ac-' + field).classList.remove('open'); }
+function acClose(field)  { setTimeout(() => { const el = document.getElementById('ac-' + field); if(el) el.classList.remove('open'); }, 200); }
+
+// ── DATABASE ───────────────────────────────────────────────────────────────
+function dbAdd(field) {
+  const input = document.getElementById('dbi-' + field);
+  const val = input.value.trim();
+  if (!val || lists[field].includes(val)) return;
+  lists[field].push(val); lists[field].sort((a,b) => a.localeCompare(b));
+  saveLists(); input.value = '';
+}
+function dbDelete(field, idx) {
+  openModal('Delete','Remove from list?','Delete', () => { lists[field].splice(idx,1); saveLists(); }, true);
+}
+function renderDbCards() {
+  ['company','quality','place'].forEach(f => {
+    document.getElementById('dbc-' + f).textContent = lists[f].length;
+    document.getElementById('dbl-' + f).innerHTML = lists[f].map((x,i) =>
+      `<div class="db-entry"><span>${esc(x)}</span><button class="db-del-btn" onclick="dbDelete('${f}',${i})">✕</button></div>`
+    ).join('');
+  });
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const live = orders.filter(o => o.status === 'live');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weeks = [
+    {label:'This Week (0–7d)',  start:0,  end:7,   orders:[],total:0},
+    {label:'Week 2 (8–14d)',    start:8,  end:14,  orders:[],total:0},
+    {label:'Week 3 (15–21d)',   start:15, end:21,  orders:[],total:0},
+    {label:'Week 4+ (22d+)',    start:22, end:9999,orders:[],total:0},
+  ];
+  live.forEach(o => {
+    const diff = Math.floor((new Date(o.delivery) - today) / 86400000);
+    const w = weeks.find(w => diff >= w.start && diff <= w.end) || weeks[3];
+    w.orders.push(o); w.total += o.qty;
+  });
+  const grand = live.reduce((s,o) => s+o.qty, 0);
+  document.getElementById('dash-timeline-total').textContent = 'Σ ' + grand.toLocaleString();
+  document.getElementById('dash-list-timeline').innerHTML = weeks.map(w => `
+    <div class="week-section">
+      <div class="week-header"><span>${w.label}</span><span style="color:var(--success)">${w.total.toLocaleString()}</span></div>
+      ${w.orders.length ? w.orders.map(o => `
+        <div class="dash-card" onclick="jumpToOrder(${o.id})">
+          <div><div class="dash-card-co">${esc(o.company)}</div><div class="dash-card-meta"><span>${esc(o.quality)}</span><span>·</span><span>${o.gsm||'—'}G</span><span>·</span><span>${fmtDate(o.delivery)}</span></div></div>
+          <div class="dash-card-qty">${o.qty.toLocaleString()}</div>
+        </div>`).join('') : '<div style="font-size:11px;color:#444;text-align:center;padding:8px;">None</div>'}
+    </div>`).join('');
+
+  const qMap = {}; live.forEach(o => { qMap[o.quality] = (qMap[o.quality]||0) + o.qty; });
+  document.getElementById('dash-quality-total').textContent = 'Σ ' + grand.toLocaleString();
+  document.getElementById('dash-list-quality').innerHTML =
+    Object.entries(qMap).sort((a,b)=>b[1]-a[1]).map(([n,q]) =>
+      `<div class="summary-item" onclick="filterLiveByGeneric('${esc(n)}')"><span class="summary-label">${esc(n)}</span><span class="summary-value">${q.toLocaleString()}</span></div>`
+    ).join('') || '<div style="color:#444;text-align:center;padding:16px;font-size:13px;">No data</div>';
+
+  const pMap = {}; live.forEach(o => { pMap[o.company] = (pMap[o.company]||0) + o.qty; });
+  document.getElementById('dash-party-total').textContent = 'Σ ' + grand.toLocaleString();
+  document.getElementById('dash-list-party').innerHTML =
+    Object.entries(pMap).sort((a,b)=>b[1]-a[1]).map(([n,q]) =>
+      `<div class="summary-item" onclick="filterLiveByGeneric('${esc(n)}')"><span class="summary-label">${esc(n)}</span><span class="summary-value">${q.toLocaleString()}</span></div>`
+    ).join('') || '<div style="color:#444;text-align:center;padding:16px;font-size:13px;">No data</div>';
+}
+function jumpToOrder(id)          { showPage('live', document.getElementById('nav-btn-live')); }
+function filterLiveByGeneric(name){ showPage('live', document.getElementById('nav-btn-live')); document.getElementById('live-search-company').value = name; renderLive(); }
+
+// ── RENDER TABLES ──────────────────────────────────────────────────────────
+function renderLive() {
+  const sc = (document.getElementById('live-search-company')?.value||'').toLowerCase();
+  const sq = (document.getElementById('live-search-quality')?.value||'').toLowerCase();
+  const live = orders.filter(o => o.status==='live' && (!sc||o.company.toLowerCase().includes(sc)) && (!sq||o.quality.toLowerCase().includes(sq)));
+
+  const tbody = document.getElementById('live-tbody');
+  tbody.innerHTML = live.length
+    ? live.map(o => {
+        const dc = deliveryClass(o.delivery);
+        return `<tr>
+          <td style="opacity:.4;font-size:11px;">#${String(o.id).padStart(3,'0')}</td>
+          <td style="color:#666;font-size:12px;">${fmtDate(o.date)}</td>
+          <td><strong style="color:#e5e5e5;">${esc(o.company)}</strong></td>
+          <td><span style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px;color:#a0a0a0;">${esc(o.quality)}</span></td>
+          <td style="color:#888;">${o.gsm||'—'}</td>
+          <td style="color:#888;font-size:12px;">${esc(o.size)||'—'}</td>
+          <td style="color:var(--success);font-weight:700;">${o.qty.toLocaleString()}</td>
+          <td style="font-size:11px;color:#666;">${esc(o.ar)} / ${esc(o.sr)}</td>
+          <td style="color:#888;">${esc(o.place)}</td>
+          <td class="${dc}">${fmtDate(o.delivery)}</td>
+          <td>${notesCell(o.notes)}</td>
+          <td style="white-space:nowrap;">
+            <button class="tbl-btn tbl-btn-edit" onclick="editOrder(${o.id})">Edit</button>
+            <button class="tbl-btn tbl-btn-done" onclick="confirmDone(${o.id})">Done</button>
+            <button class="tbl-btn tbl-btn-del"  onclick="confirmDelete(${o.id})">✕</button>
+          </td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="12" style="padding:60px;text-align:center;color:#444;">No orders</td></tr>`;
+
+  const mob = document.getElementById('live-mob-cards');
+  mob.innerHTML = live.map(o => {
+    const dc = deliveryClass(o.delivery);
+    return `<div class="mob-card">
+      <div class="mob-card-top">
+        <div><div class="mob-card-id">#${String(o.id).padStart(3,'0')} · ${fmtDate(o.date)}</div><div class="mob-card-company">${esc(o.company)}</div></div>
+        <div class="mob-card-qty">${o.qty.toLocaleString()}</div>
+      </div>
+      <div class="mob-card-tags">
+        <span class="mob-tag">${esc(o.quality)}</span>
+        ${o.gsm?`<span class="mob-tag">${o.gsm}G</span>`:''}
+        ${o.size?`<span class="mob-tag">${esc(o.size)}</span>`:''}
+        ${o.place?`<span class="mob-tag">${esc(o.place)}</span>`:''}
+        <span class="mob-tag ${dc}">📅 ${fmtDate(o.delivery)}</span>
+        ${o.ar?`<span class="mob-tag">${esc(o.ar)} / ${esc(o.sr)}</span>`:''}
+      </div>
+      ${o.notes?`<div class="mob-card-notes">${esc(o.notes)}</div>`:''}
+      <div class="mob-card-actions">
+        <button class="mob-btn-edit" onclick="editOrder(${o.id})">Edit</button>
+        <button class="mob-btn-done" onclick="confirmDone(${o.id})">Done</button>
+        <button class="mob-btn-del"  onclick="confirmDelete(${o.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;padding:40px;color:#444;">No orders</div>';
+}
+
+function renderDone() {
+  const sc = (document.getElementById('done-search-company')?.value||'').toLowerCase();
+  const sq = (document.getElementById('done-search-quality')?.value||'').toLowerCase();
+  const done = orders.filter(o => o.status==='done' && (!sc||o.company.toLowerCase().includes(sc)) && (!sq||o.quality.toLowerCase().includes(sq)));
+
+  document.getElementById('done-tbody').innerHTML = done.length
+    ? done.map(o => `<tr>
+        <td style="opacity:.4;font-size:11px;">#${String(o.id).padStart(3,'0')}</td>
+        <td style="color:#666;font-size:12px;">${fmtDate(o.date)}</td>
+        <td><strong style="color:#e5e5e5;">${esc(o.company)}</strong></td>
+        <td><span style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px;color:#a0a0a0;">${esc(o.quality)}</span></td>
+        <td style="color:#888;">${o.gsm||'—'}</td>
+        <td style="color:#888;font-size:12px;">${esc(o.size)||'—'}</td>
+        <td style="color:var(--success);font-weight:700;">${o.qty.toLocaleString()}</td>
+        <td style="font-size:11px;color:#666;">${esc(o.ar)} / ${esc(o.sr)}</td>
+        <td style="color:#888;">${esc(o.place)}</td>
+        <td style="color:#666;">${fmtDate(o.delivery)}</td>
+        <td style="color:var(--success);">${fmtDate(o.completedOn)}</td>
+        <td>${notesCell(o.notes)}</td>
+        <td><button class="tbl-btn tbl-btn-rev" onclick="confirmRevert(${o.id})">Revert</button></td>
+      </tr>`).join('')
+    : `<tr><td colspan="13" style="padding:60px;text-align:center;color:#444;">No completed orders</td></tr>`;
+
+  const mob = document.getElementById('done-mob-cards');
+  mob.innerHTML = done.map(o => `<div class="mob-card">
+    <div class="mob-card-top">
+      <div><div class="mob-card-id">#${String(o.id).padStart(3,'0')} · ${fmtDate(o.date)}</div><div class="mob-card-company">${esc(o.company)}</div></div>
+      <div class="mob-card-qty">${o.qty.toLocaleString()}</div>
+    </div>
+    <div class="mob-card-tags">
+      <span class="mob-tag">${esc(o.quality)}</span>
+      ${o.gsm?`<span class="mob-tag">${o.gsm}G</span>`:''}
+      ${o.place?`<span class="mob-tag">${esc(o.place)}</span>`:''}
+    </div>
+    <div class="mob-card-done-meta">✅ Completed ${fmtDate(o.completedOn)}</div>
+    <div class="mob-card-actions">
+      <button class="mob-btn-revert" onclick="confirmRevert(${o.id})">Revert to Live</button>
+    </div>
+  </div>`).join('') || '<div style="text-align:center;padding:40px;color:#444;">No completed orders</div>';
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function fmtDate(str) { if(!str) return '—'; const [y,m,d]=str.split('-'); return `${d}/${m}/${y}`; }
+function esc(s) { if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',3000); }
+function deliveryClass(str) {
+  if(!str) return '';
+  const d = new Date(); d.setHours(0,0,0,0);
+  const diff = (new Date(str)-d)/86400000;
+  return diff < 0 ? 'overdue' : diff <= 3 ? 'soon' : '';
+}
+function notesCell(notes) {
+  if(!notes) return '—';
+  const e = esc(notes);
+  return `<div class="notes-cell"><span class="notes-text">${e}</span><div class="notes-tip">${e}</div></div>`;
+}
+
+// ── BOOT ─────────────────────────────────────────────────────────────────
+window.onload = function() {
+  firebase.initializeApp({
+    apiKey:            "AIzaSyC4QglljaBmMDU3kKhqX8QJsXaJDx25N-Q",
+    authDomain:        "param-siddh.firebaseapp.com",
+    projectId:         "param-siddh",
+    storageBucket:     "param-siddh.firebasestorage.app",
+    messagingSenderId: "220860264500",
+    appId:             "1:220860264500:web:67b08d5e1548e373ce5a61"
+  });
+  db = firebase.firestore();
+  loadAll();
+};
+</script>
+</body>
+</html>
